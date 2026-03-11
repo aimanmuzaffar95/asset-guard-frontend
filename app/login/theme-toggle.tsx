@@ -6,9 +6,17 @@ import { useState } from "react";
 type Theme = "light" | "dark";
 
 export function ThemeToggle() {
-  const [theme, setTheme] = useState<Theme>(() =>
-    document.documentElement.classList.contains("dark") ? "dark" : "light",
-  );
+  const [theme, setTheme] = useState<Theme>(() => {
+    if (typeof window === "undefined") {
+      return "light";
+    }
+
+    const storedTheme = window.localStorage.getItem("theme");
+
+    return storedTheme === "dark" || document.documentElement.classList.contains("dark")
+      ? "dark"
+      : "light";
+  });
 
   function updateTheme(nextTheme: Theme) {
     const root = document.documentElement;
