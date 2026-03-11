@@ -28,6 +28,7 @@
 
 # environment
 .env*
+!.env.example
 
 # local platform files
 .DS_Store
