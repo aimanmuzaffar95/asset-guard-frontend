@@ -162,7 +162,7 @@ export function LoginForm({ apiBaseUrl }: LoginFormProps) {
             submissionState.status === "error"
               ? "text-rose-500"
               : submissionState.status === "success"
-                ? "text-emerald-600 dark:text-emerald-400"
+                ? "text-emerald-600"
                 : "text-transparent"
           }`}
         >

@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import { LoginForm } from "./login-form";
-import { ThemeToggle } from "./theme-toggle";
 
 export const metadata: Metadata = {
   title: "Login",
@@ -14,7 +13,6 @@ export default function LoginPage() {
   return (
     <main className="flex min-h-screen items-center justify-center bg-[var(--page-background)] p-4 transition-colors">
       <div className="w-full max-w-md">
-        <ThemeToggle />
         <section className="overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--surface)] shadow-xl transition-colors">
           <header className="p-8 pb-0 text-center">
             <div className="mb-4 inline-flex items-center justify-center rounded-xl bg-primary/10 p-3 text-primary">
