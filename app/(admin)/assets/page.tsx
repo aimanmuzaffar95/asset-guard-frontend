@@ -1,5 +1,6 @@
 import DashboardHeader from "../_components/dashboard-header";
 import Image from "next/image";
+import AssetFilters from "./_components/asset-category-filter";
 
 export default function AssetsPage() {
   return (
@@ -24,52 +25,7 @@ export default function AssetsPage() {
         </div>
 
         {/* Filter Toolbar */}
-        <div className="flex flex-wrap items-center gap-3 mb-6">
-          <div className="relative group">
-            <button className="flex h-10 items-center justify-between gap-x-2 rounded-lg border border-slate-200 bg-white px-4 text-sm font-medium text-slate-700 hover:border-primary/50">
-              <span className="flex items-center gap-2">
-                <span className="material-symbols-outlined text-lg text-slate-400">
-                  category
-                </span>
-                Category: All
-              </span>
-              <span className="material-symbols-outlined text-lg">
-                expand_more
-              </span>
-            </button>
-          </div>
-          <div className="relative group">
-            <button className="flex h-10 items-center justify-between gap-x-2 rounded-lg border border-slate-200 bg-white px-4 text-sm font-medium text-slate-700 hover:border-primary/50">
-              <span className="flex items-center gap-2">
-                <span className="material-symbols-outlined text-lg text-slate-400">
-                  check_circle
-                </span>
-                Status: All
-              </span>
-              <span className="material-symbols-outlined text-lg">
-                expand_more
-              </span>
-            </button>
-          </div>
-          <div className="h-6 w-px bg-slate-200 mx-1 hidden sm:block"></div>
-          <div className="flex gap-2">
-            <button className="rounded-lg bg-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-700">
-              Laptops
-            </button>
-            <button className="rounded-lg bg-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-700">
-              Furniture
-            </button>
-            <button className="rounded-lg bg-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-700">
-              Peripherals
-            </button>
-          </div>
-          <button className="ml-auto flex items-center gap-2 text-slate-500 hover:text-primary transition-colors text-sm font-medium">
-            <span className="material-symbols-outlined text-lg">
-              filter_alt
-            </span>
-            Advanced Filters
-          </button>
-        </div>
+        <AssetFilters/>
 
         {/* Table Card */}
         <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
