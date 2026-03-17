@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import type { SyntheticEvent } from "react";
+import { useRouter } from "next/navigation";
 
 type LoginFormProps = {
   apiBaseUrl: string;
@@ -34,6 +35,7 @@ type LoginResponse = {
 };
 
 export function LoginForm({ apiBaseUrl }: LoginFormProps) {
+  const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -65,6 +67,10 @@ export function LoginForm({ apiBaseUrl }: LoginFormProps) {
         status: isSuccess ? "success" : "error",
         message,
       });
+
+      if (isSuccess && responseData?.data?.user?.role === "admin") {
+        router.push("/dashboard");
+      }
     } catch {
       setSubmissionState({
         status: "error",
