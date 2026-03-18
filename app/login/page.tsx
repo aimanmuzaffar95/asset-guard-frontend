@@ -6,9 +6,6 @@ export const metadata: Metadata = {
   description: "Sign in to Asset Guard.",
 };
 
-const LOGIN_API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_BASE_URL ?? "https://asset-guard-pied.vercel.app";
-
 export default function LoginPage() {
   return (
     <main className="flex min-h-screen items-center justify-center bg-[var(--page-background)] p-4 transition-colors">
@@ -26,7 +23,7 @@ export default function LoginPage() {
             </p>
           </header>
 
-          <LoginForm apiBaseUrl={LOGIN_API_BASE_URL} />
+          <LoginForm />
 
           <footer className="border-t border-[var(--border-soft)] bg-[var(--footer-surface)] px-8 py-6 text-center transition-colors">
             <p className="text-sm text-[var(--text-muted)]">

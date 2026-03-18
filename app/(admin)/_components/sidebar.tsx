@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
+import { useState } from "react";
 
 type NavItem = {
   label: string;
@@ -42,8 +43,34 @@ export default function Sidebar({
   navItems = defaultNav,
   onLogoutClick,
 }: SidebarProps) {
+  const router = useRouter();
   const pathname = usePathname();
   const currentHref = activeHref ?? pathname;
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
+
+  async function handleLogout() {
+    if (onLogoutClick) {
+      onLogoutClick();
+      return;
+    }
+
+    if (isLoggingOut) {
+      return;
+    }
+
+    setIsLoggingOut(true);
+
+    try {
+      await fetch("/api/auth/logout", {
+        method: "POST",
+        credentials: "include",
+      });
+    } finally {
+      router.replace("/login");
+      router.refresh();
+      setIsLoggingOut(false);
+    }
+  }
 
   return (
     <aside className="w-64 flex-shrink-0 overflow-y-auto border-r border-[var(--border)] bg-[var(--surface)] transition-colors">
@@ -105,20 +132,15 @@ export default function Sidebar({
               </p>
             </div>
 
-            {onLogoutClick ? (
-              <button
-                type="button"
-                onClick={onLogoutClick}
-                className="rounded-md p-1 text-[var(--text-muted)] hover:bg-[var(--surface-muted)]"
-                aria-label="Logout"
-              >
-                <span className="material-symbols-outlined text-lg">logout</span>
-              </button>
-            ) : (
-              <span className="material-symbols-outlined text-lg text-[var(--text-muted)]">
-                logout
-              </span>
-            )}
+            <button
+              type="button"
+              onClick={handleLogout}
+              disabled={isLoggingOut}
+              className="rounded-md p-1 text-[var(--text-muted)] hover:bg-[var(--surface-muted)] disabled:cursor-not-allowed disabled:opacity-60"
+              aria-label={isLoggingOut ? "Logging out" : "Logout"}
+            >
+              <span className="material-symbols-outlined text-lg">logout</span>
+            </button>
           </div>
         </div>
       </div>

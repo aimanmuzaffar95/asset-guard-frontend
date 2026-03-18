@@ -4,10 +4,6 @@ import { useState } from "react";
 import type { SyntheticEvent } from "react";
 import { useRouter } from "next/navigation";
 
-type LoginFormProps = {
-  apiBaseUrl: string;
-};
-
 type SubmissionState = {
   status: "idle" | "success" | "error";
   message: string;
@@ -34,7 +30,7 @@ type LoginResponse = {
   };
 };
 
-export function LoginForm({ apiBaseUrl }: LoginFormProps) {
+export function LoginForm() {
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -50,12 +46,13 @@ export function LoginForm({ apiBaseUrl }: LoginFormProps) {
     setSubmissionState({ status: "idle", message: "" });
 
     try {
-      const response = await fetch(`${apiBaseUrl}/auth/login`, {
+      const response = await fetch("/api/auth/login", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           Accept: "application/json",
         },
+        credentials: "include",
         body: JSON.stringify({ email: email.trim(), password }),
       });
 
@@ -68,8 +65,9 @@ export function LoginForm({ apiBaseUrl }: LoginFormProps) {
         message,
       });
 
-      if (isSuccess && responseData?.data?.user?.role === "admin") {
+      if (isSuccess) {
         router.push("/dashboard");
+        router.refresh();
       }
     } catch {
       setSubmissionState({
