@@ -1,5 +1,3 @@
-const DEFAULT_API_BASE_URL = "https://asset-guard-pied.vercel.app";
-
 function requireEnv(name: string, value: string | undefined) {
   if (!value) {
     throw new Error(`Missing required environment variable: ${name}`);
@@ -8,13 +6,15 @@ function requireEnv(name: string, value: string | undefined) {
   return value;
 }
 
-export function getApiBaseUrl() {
-  return process.env.API_BASE_URL ?? process.env.NEXT_PUBLIC_API_BASE_URL ?? DEFAULT_API_BASE_URL;
+function normalizeBaseUrl(url: string) {
+  return url.endsWith("/") ? url.slice(0, -1) : url;
 }
 
-export function getPublicApiBaseUrl() {
-  return requireEnv(
-    "NEXT_PUBLIC_API_BASE_URL",
-    process.env.NEXT_PUBLIC_API_BASE_URL,
-  );
+export function getBaseUrl() {
+  return normalizeBaseUrl(requireEnv("BASE_URL", process.env.BASE_URL));
+}
+
+export function buildApiUrl(path: string) {
+  const normalizedPath = path.startsWith("/") ? path : `/${path}`;
+  return `${getBaseUrl()}${normalizedPath}`;
 }

@@ -3,7 +3,7 @@ import DashboardHeader from "../_components/dashboard-header";
 import MetricCard from "../_components/metric-card";
 import RecentAssignments from "../_components/recent-assignments";
 import AssetDistribution from "../_components/asset-distribution";
-import { getApiBaseUrl } from "@/lib/config";
+import { buildApiUrl } from "@/lib/config";
 
 type DashboardTotals = {
   totalAssets?: number;
@@ -32,6 +32,52 @@ type DashboardResponse = {
   };
 };
 
+type AssignmentHistoryItem = {
+  id?: string | number;
+  assetName?: string;
+  asset?: string | {
+    name?: string;
+    assetName?: string;
+    code?: string;
+    serialOrTag?: string;
+  };
+  assetCode?: string;
+  serialOrTag?: string;
+  staffName?: string;
+  assignedTo?: string;
+  assignedAt?: string;
+  date?: string;
+  returnedAt?: string;
+  createdAt?: string;
+  updatedAt?: string;
+  status?: string;
+  action?: string;
+  eventType?: string;
+  type?: string;
+  staff?: {
+    name?: string;
+    staffName?: string;
+    firstName?: string;
+    lastName?: string;
+  };
+};
+
+type AssignmentHistoryResponse = {
+  success?: boolean;
+  data?: AssignmentHistoryItem[] | { assignments?: AssignmentHistoryItem[] } | unknown;
+  error?: {
+    messages?: string[];
+  };
+};
+
+export type Assignment = {
+  id: string;
+  assetName: string;
+  staffName: string;
+  date: string;
+  status: "Assigned" | "Returned" | "Pending";
+};
+
 type DashboardViewData = {
   totals: {
     totalAssets: number;
@@ -48,7 +94,10 @@ type DashboardViewData = {
 };
 
 export default async function DashboardPage() {
-  const dashboardResult = await getDashboardData();
+  const [dashboardResult, assignmentsResult] = await Promise.all([
+    getDashboardData(),
+    getAssignmentHistory(),
+  ]);
 
   if (dashboardResult.status === "error") {
     return (
@@ -149,7 +198,9 @@ export default async function DashboardPage() {
 
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
           <div className="lg:col-span-2">
-            <RecentAssignments />
+            <RecentAssignments
+              assignments={assignmentsResult.status === "success" ? assignmentsResult.data : []}
+            />
           </div>
           <div>
             <AssetDistribution categories={dashboardData.assetDistribution} />
@@ -158,6 +209,165 @@ export default async function DashboardPage() {
       </main>
     </div>
   );
+}
+
+async function getAssignmentHistory(): Promise<
+  { status: "success"; data: Assignment[] } | { status: "error"; message: string }
+> {
+  const cookieStore = await cookies();
+  const accessToken = cookieStore.get("access_token")?.value;
+
+  if (!accessToken) {
+    return { status: "error", message: "Missing access token." };
+  }
+
+  let response: Response;
+
+  try {
+    response = await fetch(buildApiUrl("/admin/dashboard/assignment-history"), {
+      method: "GET",
+      headers: {
+        Accept: "application/json",
+        Authorization: `Bearer ${accessToken}`,
+      },
+      cache: "no-store",
+    });
+  } catch {
+    return { status: "error", message: "Assignment history service could not be reached." };
+  }
+
+  const responseData = (await parseJson(response)) as AssignmentHistoryResponse | null;
+
+  if (!response.ok || responseData?.success !== true || !responseData.data) {
+    return {
+      status: "error",
+      message:
+        responseData?.error?.messages?.filter(Boolean).join(" ") ||
+        "Failed to load assignment history.",
+    };
+  }
+
+  const items = extractAssignmentItems(responseData.data);
+
+  return {
+    status: "success",
+    data: items
+      .map((item, index) => normalizeAssignment(item, index))
+      .sort((left, right) => right.timestamp - left.timestamp)
+      .slice(0, 5)
+      .map(stripAssignmentTimestamp),
+  };
+}
+
+function extractAssignmentItems(data: unknown): AssignmentHistoryItem[] {
+  if (Array.isArray(data)) return data as AssignmentHistoryItem[];
+  if (data && typeof data === "object") {
+    const nested = (data as Record<string, unknown>);
+    for (const key of [
+      "assignments",
+      "assignmentHistory",
+      "history",
+      "events",
+      "records",
+      "data",
+      "items",
+      "results",
+    ]) {
+      if (Array.isArray(nested[key])) return nested[key] as AssignmentHistoryItem[];
+    }
+  }
+  return [];
+}
+
+function normalizeAssignment(item: AssignmentHistoryItem, index: number): Assignment & { timestamp: number } {
+  const rawStatus = resolveAssignmentStatus(item);
+  const status: Assignment["status"] =
+    rawStatus === "returned"
+      ? "Returned"
+      : rawStatus === "pending"
+        ? "Pending"
+        : "Assigned";
+
+  const assetName =
+    firstNonEmptyString(
+      item.assetName,
+      typeof item.asset === "string" ? item.asset : undefined,
+      item.asset?.name,
+      item.asset?.assetName,
+      item.assetCode,
+      item.asset?.code,
+      item.serialOrTag,
+      item.asset?.serialOrTag,
+    ) || "Unknown Asset";
+
+  const staffName =
+    firstNonEmptyString(
+      item.staffName,
+      item.assignedTo,
+      item.staff?.name,
+      item.staff?.staffName,
+      buildFullName(item.staff?.firstName, item.staff?.lastName),
+    ) || "Unknown Staff";
+
+  const timestampSource =
+    firstNonEmptyString(item.assignedAt, item.date, item.returnedAt, item.createdAt, item.updatedAt) || "";
+  const timestamp = parseTimestamp(timestampSource);
+
+  return {
+    id: String(item.id ?? index),
+    assetName,
+    staffName,
+    date: formatDate(timestampSource),
+    status,
+    timestamp,
+  };
+}
+
+function resolveAssignmentStatus(item: AssignmentHistoryItem) {
+  const value = firstNonEmptyString(item.status, item.action, item.eventType, item.type)?.toLowerCase();
+
+  if (!value) return "assigned";
+  if (value.includes("return")) return "returned";
+  if (value.includes("pending")) return "pending";
+  if (value.includes("assign")) return "assigned";
+
+  return value;
+}
+
+function firstNonEmptyString(...values: Array<string | undefined>) {
+  for (const value of values) {
+    const trimmed = value?.trim();
+    if (trimmed) return trimmed;
+  }
+
+  return undefined;
+}
+
+function buildFullName(firstName?: string, lastName?: string) {
+  const name = [firstName?.trim(), lastName?.trim()].filter(Boolean).join(" ").trim();
+  return name || undefined;
+}
+
+function parseTimestamp(value?: string) {
+  if (!value) return 0;
+
+  const timestamp = new Date(value).getTime();
+  return Number.isNaN(timestamp) ? 0 : timestamp;
+}
+
+function stripAssignmentTimestamp({
+  timestamp,
+  ...assignment
+}: Assignment & { timestamp: number }) {
+  void timestamp;
+  return assignment;
+}
+
+function formatDate(value?: string) {
+  if (!value) return "—";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "—";
+  return new Intl.DateTimeFormat("en-US", { year: "numeric", month: "short", day: "numeric" }).format(date);
 }
 
 async function getDashboardData(): Promise<
@@ -183,7 +393,7 @@ async function getDashboardData(): Promise<
   let response: Response;
 
   try {
-    response = await fetch(`${getApiBaseUrl()}/admin/dashboard`, {
+    response = await fetch(buildApiUrl("/admin/dashboard"), {
       method: "GET",
       headers: {
         Accept: "application/json",

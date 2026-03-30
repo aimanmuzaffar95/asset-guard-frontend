@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { buildApiUrl } from "@/lib/config";
 
 type LoginRequestBody = {
   email?: string;
@@ -20,7 +21,6 @@ type LoginApiResponse = {
   };
 };
 
-const DEFAULT_API_BASE_URL = "https://asset-guard-pied.vercel.app";
 const DEFAULT_ACCESS_TOKEN_MAX_AGE_SECONDS = 60 * 60;
 const DEFAULT_REFRESH_TOKEN_MAX_AGE_SECONDS = 60 * 60 * 24 * 30;
 
@@ -56,12 +56,10 @@ export async function POST(request: Request) {
     );
   }
 
-  const apiBaseUrl = process.env.API_BASE_URL ?? process.env.NEXT_PUBLIC_API_BASE_URL ?? DEFAULT_API_BASE_URL;
-
   let upstreamResponse: Response;
 
   try {
-    upstreamResponse = await fetch(`${apiBaseUrl}/auth/login`, {
+    upstreamResponse = await fetch(buildApiUrl("/auth/login"), {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
