@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { cookies } from "next/headers";
 import { buildApiUrl } from "@/lib/config";
 import { parseJson } from "../../dashboard/page";
@@ -17,19 +18,28 @@ type StaffMember = {
   firstName: string;
   lastName: string;
   role: "admin" | "staff";
-  activeAssignementsCount: number;
+  activeAssignmentsCount: number;
 };
 
-type StaffMemberResponse = {
+type PaginatedStaffResponse = {
   success?: boolean;
-  data?: StaffMember[] | { staffMembers?: StaffMember[] } | unknown;
+  data?: {
+    items?: StaffMember[];
+    currentPage?: number;
+    totalPages?: number;
+    hasNext?: boolean;
+  };
   error?: {
     messages?: string[];
   };
 };
 
-export default async function StaffTable() {
-  const result = await getStaffMembers();
+type StaffResult =
+  | { status: "success"; data: StaffRow[]; currentPage: number; totalPages: number }
+  | { status: "error"; message: string };
+
+export default async function StaffTable({ page }: { page: number }) {
+  const result = await getStaffMembers(page);
 
   if (result.status === "error") {
     return (
@@ -45,7 +55,8 @@ export default async function StaffTable() {
     );
   }
 
-  const staffMembers = result.data;
+  const { data: staffMembers, currentPage, totalPages } = result;
+  const pageNumbers = buildPageNumbers(currentPage, totalPages);
 
   return (
     <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
@@ -120,37 +131,84 @@ export default async function StaffTable() {
 
       <div className="flex items-center justify-between border-t border-slate-200 px-6 py-4">
         <p className="text-sm text-slate-500">
-          Showing 1 to 5 of 42 results
+          Page {currentPage} of {totalPages}
         </p>
         <div className="flex items-center gap-1">
-          <button className="flex size-8 items-center justify-center rounded-lg text-slate-600 transition-colors hover:bg-slate-200 md:size-10">
-            <span className="material-symbols-outlined text-sm md:text-base">chevron_left</span>
-          </button>
-          <button className="flex size-8 md:size-10 items-center justify-center text-xs md:text-sm font-bold bg-primary text-white rounded-lg shadow-sm">
-            1
-          </button>
-          <button className="flex size-8 items-center justify-center rounded-lg text-xs font-medium text-slate-600 transition-colors hover:bg-slate-200 md:size-10 md:text-sm">
-            2
-          </button>
-          <button className="flex size-8 items-center justify-center rounded-lg text-xs font-medium text-slate-600 transition-colors hover:bg-slate-200 md:size-10 md:text-sm">
-            3
-          </button>
-          <span className="px-1 md:px-2 text-slate-400 text-sm md:text-base">...</span>
-          <button className="flex size-8 items-center justify-center rounded-lg text-xs font-medium text-slate-600 transition-colors hover:bg-slate-200 md:size-10 md:text-sm">
-            9
-          </button>
-          <button className="flex size-8 items-center justify-center rounded-lg text-slate-600 transition-colors hover:bg-slate-200 md:size-10">
-            <span className="material-symbols-outlined text-sm md:text-base">chevron_right</span>
-          </button>
+          {currentPage > 1 ? (
+            <Link
+              href={`?page=${currentPage - 1}`}
+              className="flex size-8 items-center justify-center rounded-lg text-slate-600 transition-colors hover:bg-slate-200 md:size-10"
+              aria-label="Previous page"
+            >
+              <span className="material-symbols-outlined text-sm md:text-base">chevron_left</span>
+            </Link>
+          ) : (
+            <span className="flex size-8 items-center justify-center rounded-lg text-slate-300 md:size-10 cursor-not-allowed">
+              <span className="material-symbols-outlined text-sm md:text-base">chevron_left</span>
+            </span>
+          )}
+
+          {pageNumbers.map((entry, i) =>
+            entry === "ellipsis" ? (
+              <span key={`ellipsis-${i}`} className="px-1 md:px-2 text-slate-400 text-sm md:text-base">
+                ...
+              </span>
+            ) : (
+              <Link
+                key={entry}
+                href={`?page=${entry}`}
+                className={`flex size-8 md:size-10 items-center justify-center text-xs md:text-sm font-bold rounded-lg transition-colors ${
+                  entry === currentPage
+                    ? "bg-primary text-white shadow-sm"
+                    : "text-slate-600 hover:bg-slate-200"
+                }`}
+                aria-label={`Page ${entry}`}
+                aria-current={entry === currentPage ? "page" : undefined}
+              >
+                {entry}
+              </Link>
+            )
+          )}
+
+          {currentPage < totalPages ? (
+            <Link
+              href={`?page=${currentPage + 1}`}
+              className="flex size-8 items-center justify-center rounded-lg text-slate-600 transition-colors hover:bg-slate-200 md:size-10"
+              aria-label="Next page"
+            >
+              <span className="material-symbols-outlined text-sm md:text-base">chevron_right</span>
+            </Link>
+          ) : (
+            <span className="flex size-8 items-center justify-center rounded-lg text-slate-300 md:size-10 cursor-not-allowed">
+              <span className="material-symbols-outlined text-sm md:text-base">chevron_right</span>
+            </span>
+          )}
         </div>
       </div>
     </div>
   );
 }
 
-async function getStaffMembers(): Promise<
-  { status: "success"; data: StaffRow[] } | { status: "error"; message: string }
-> {
+function buildPageNumbers(current: number, total: number): (number | "ellipsis")[] {
+  if (total <= 7) {
+    return Array.from({ length: total }, (_, i) => i + 1);
+  }
+
+  const pages: (number | "ellipsis")[] = [];
+  const window = new Set([1, total, current - 1, current, current + 1].filter((p) => p >= 1 && p <= total));
+  const sorted = Array.from(window).sort((a, b) => a - b);
+
+  for (let i = 0; i < sorted.length; i++) {
+    pages.push(sorted[i]);
+    if (i < sorted.length - 1 && sorted[i + 1] - sorted[i] > 1) {
+      pages.push("ellipsis");
+    }
+  }
+
+  return pages;
+}
+
+async function getStaffMembers(page: number): Promise<StaffResult> {
   const cookieStore = await cookies();
   const accessToken = cookieStore.get("access_token")?.value;
 
@@ -164,7 +222,7 @@ async function getStaffMembers(): Promise<
   let response: Response;
 
   try {
-    response = await fetch(buildApiUrl("/users"), {
+    response = await fetch(buildApiUrl(`/users?page=${page}`), {
       method: "GET",
       headers: {
         Accept: "application/json",
@@ -179,7 +237,7 @@ async function getStaffMembers(): Promise<
     };
   }
 
-  const responseData = (await parseJson(response)) as StaffMemberResponse | null;
+  const responseData = (await parseJson(response)) as PaginatedStaffResponse | null;
 
   if (!response.ok || responseData?.success !== true || !responseData.data) {
     return {
@@ -190,23 +248,14 @@ async function getStaffMembers(): Promise<
     };
   }
 
-  const members = extractStaffItems(responseData.data);
+  const { items = [], currentPage = page, totalPages = 1 } = responseData.data;
 
   return {
     status: "success",
-    data: members.map(normalizeStaffMember),
+    data: items.map(normalizeStaffMember),
+    currentPage,
+    totalPages,
   };
-}
-
-function extractStaffItems(data: unknown): StaffMember[] {
-  if (Array.isArray(data)) return data as StaffMember[];
-  if (data && typeof data === "object") {
-    const nested = data as Record<string, unknown>;
-    for (const key of ["staffMembers", "staff", "users", "data", "items", "results"]) {
-      if (Array.isArray(nested[key])) return nested[key] as StaffMember[];
-    }
-  }
-  return [];
 }
 
 function normalizeStaffMember(member: StaffMember): StaffRow {
@@ -222,6 +271,6 @@ function normalizeStaffMember(member: StaffMember): StaffRow {
     initials,
     email: member.email ?? "—",
     role: member.role ?? "staff",
-    assetsCount: typeof member.activeAssignementsCount === "number" ? member.activeAssignementsCount : 0,
+    assetsCount: typeof member.activeAssignmentsCount === "number" ? member.activeAssignmentsCount : 0,
   };
 }
