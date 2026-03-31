@@ -1,7 +1,16 @@
+import { Suspense } from "react";
 import DashboardHeader from "../_components/dashboard-header";
 import StaffTable from "./_components/staff-table";
+import StaffTableSkeleton from "./_components/staff-table-skeleton";
 
-export default function StaffPage() {
+export default async function StaffPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ page?: string }>;
+}) {
+  const { page } = await searchParams;
+  const currentPage = Math.max(1, parseInt(page ?? "1", 10) || 1);
+
   return (
     <div className="flex flex-col min-h-screen">
       <DashboardHeader />
@@ -39,7 +48,9 @@ export default function StaffPage() {
         </div>
 
         {/* Table Container */}
-        <StaffTable />
+        <Suspense key={currentPage} fallback={<StaffTableSkeleton />}>
+          <StaffTable page={currentPage} />
+        </Suspense>
       </main>
     </div>
   );
