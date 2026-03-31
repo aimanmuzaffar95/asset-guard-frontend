@@ -62,6 +62,8 @@ type AssignmentHistoryItem = {
   };
 };
 
+type AssignmentAssetDetails = Exclude<AssignmentHistoryItem["asset"], string | undefined>;
+
 type AssignmentHistoryResponse = {
   success?: boolean;
   data?: AssignmentHistoryItem[] | { assignments?: AssignmentHistoryItem[] } | unknown;
@@ -287,17 +289,18 @@ function normalizeAssignment(item: AssignmentHistoryItem, index: number): Assign
       : rawStatus === "pending"
         ? "Pending"
         : "Assigned";
+  const assetDetails = isAssignmentAssetDetails(item.asset) ? item.asset : undefined;
 
   const assetName =
     firstNonEmptyString(
       item.assetName,
       typeof item.asset === "string" ? item.asset : undefined,
-      item.asset?.name,
-      item.asset?.assetName,
+      assetDetails?.name,
+      assetDetails?.assetName,
       item.assetCode,
-      item.asset?.code,
+      assetDetails?.code,
       item.serialOrTag,
-      item.asset?.serialOrTag,
+      assetDetails?.serialOrTag,
     ) || "Unknown Asset";
 
   const staffName =
@@ -332,6 +335,12 @@ function resolveAssignmentStatus(item: AssignmentHistoryItem) {
   if (value.includes("assign")) return "assigned";
 
   return value;
+}
+
+function isAssignmentAssetDetails(
+  value: AssignmentHistoryItem["asset"],
+): value is AssignmentAssetDetails {
+  return Boolean(value) && typeof value === "object";
 }
 
 function firstNonEmptyString(...values: Array<string | undefined>) {
