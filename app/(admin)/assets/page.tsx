@@ -1,3 +1,4 @@
+import Link from "next/link";
 import DashboardHeader from "../_components/dashboard-header";
 import AssetsTable from "./_components/assets-table";
 import AssetFilters from "./_components/asset-category-filter";
@@ -18,10 +19,13 @@ export default function AssetsPage() {
               Monitor and manage company equipment and assignments.
             </p>
           </div>
-          <button className="flex items-center gap-2 rounded-lg bg-primary px-5 py-2.5 text-white text-sm font-bold shadow-lg shadow-primary/20 hover:bg-primary/90 transition-all">
+          <Link
+            href="/assets/new"
+            className="flex items-center gap-2 rounded-lg bg-primary px-5 py-2.5 text-white text-sm font-bold shadow-lg shadow-primary/20 hover:bg-primary/90 transition-all"
+          >
             <span className="material-symbols-outlined text-lg">add</span>
             <span>Add Asset Item</span>
-          </button>
+          </Link>
         </div>
 
         {/* Filter Toolbar */}
