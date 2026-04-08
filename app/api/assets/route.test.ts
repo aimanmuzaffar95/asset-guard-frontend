@@ -1,5 +1,5 @@
 import { cookies } from "next/headers";
-import { POST } from "./route";
+import { GET, POST } from "./route";
 
 vi.mock("next/headers", () => ({
   cookies: vi.fn(),
@@ -203,6 +203,124 @@ describe("POST /api/assets", () => {
     });
 
     const response = await POST(request);
+    const data = await response.json();
+
+    expect(response.status).toBe(502);
+    expect(data.error.messages).toEqual(["Unable to reach the asset service."]);
+  });
+});
+
+describe("GET /api/assets", () => {
+  const cookiesMock = vi.mocked(cookies);
+  const fetchMock = vi.fn();
+
+  beforeEach(() => {
+    process.env.BASE_URL = "https://api.example.com";
+    vi.stubGlobal("fetch", fetchMock);
+    fetchMock.mockReset();
+    cookiesMock.mockReset();
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("returns 401 when the access token cookie is missing", async () => {
+    cookiesMock.mockResolvedValue({
+      get: vi.fn().mockReturnValue(undefined),
+    } as never);
+
+    const response = await GET();
+    const data = await response.json();
+
+    expect(response.status).toBe(401);
+    expect(data.error.messages).toEqual(["Authentication required."]);
+  });
+
+  it("forwards the asset list from the backend", async () => {
+    cookiesMock.mockResolvedValue({
+      get: vi.fn().mockReturnValue({ value: "token" }),
+    } as never);
+    fetchMock.mockResolvedValue(
+      createJsonResponse(
+        {
+          success: true,
+          data: [
+            {
+              id: "e6ecb650-cad2-4c29-ac1f-739055aeb552",
+              name: "Samsung S22 Pro",
+              serialNumber: "SM-S36464HF",
+              status: "available",
+              notes: "Added from the frontend",
+              createdAt: "2026-03-31T11:49:21.524Z",
+              updatedAt: "2026-03-31T11:49:21.524Z",
+              assetType: {
+                id: "366cad87-585b-47f4-9805-fe56a4ba0d37",
+                name: "phone",
+                description: "Mobile Phone",
+              },
+              assignedTo: null,
+            },
+          ],
+          meta: {
+            statusCode: 200,
+            path: "/assets",
+            method: "GET",
+            timestamp: "2026-04-08T09:05:08.993Z",
+          },
+        },
+        200,
+      ),
+    );
+
+    const response = await GET();
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(data.success).toBe(true);
+    expect(data.data).toHaveLength(1);
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://api.example.com/assets",
+      expect.objectContaining({
+        method: "GET",
+        headers: expect.objectContaining({
+          Authorization: "Bearer token",
+        }),
+      }),
+    );
+  });
+
+  it("forwards backend list errors", async () => {
+    cookiesMock.mockResolvedValue({
+      get: vi.fn().mockReturnValue({ value: "token" }),
+    } as never);
+    fetchMock.mockResolvedValue(
+      createJsonResponse(
+        {
+          success: false,
+          error: {
+            messages: ["Forbidden resource"],
+            code: "FORBIDDEN",
+          },
+        },
+        403,
+      ),
+    );
+
+    const response = await GET();
+    const data = await response.json();
+
+    expect(response.status).toBe(403);
+    expect(data.error.messages).toEqual(["Forbidden resource"]);
+  });
+
+  it("returns 502 when the asset service is unreachable", async () => {
+    cookiesMock.mockResolvedValue({
+      get: vi.fn().mockReturnValue({ value: "token" }),
+    } as never);
+    fetchMock.mockRejectedValue(new Error("network error"));
+
+    const response = await GET();
     const data = await response.json();
 
     expect(response.status).toBe(502);

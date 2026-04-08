@@ -1,6 +1,12 @@
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { buildApiUrl } from "@/lib/config";
+import type {
+  AssetListErrorResponse,
+  AssetListSuccessResponse,
+  CreateAssetErrorResponse,
+  CreateAssetSuccessResponse,
+} from "@/lib/assets";
 
 type CreateAssetRequestBody = {
   name?: string;
@@ -9,49 +15,74 @@ type CreateAssetRequestBody = {
   notes?: string | null;
 };
 
-type AssetType = {
-  id: string;
-  name: string;
-  description: string | null;
-};
-
-type CreateAssetSuccessResponse = {
-  success: true;
-  data: {
-    id: string;
-    assetTypeId: string;
-    name: string;
-    serialNumber: string;
-    notes: string | null;
-    status: string;
-    createdAt: string;
-    updatedAt: string;
-    assetType: AssetType;
-  };
-  meta?: {
-    statusCode?: number;
-    path?: string;
-    method?: string;
-    timestamp?: string;
-  };
-};
-
-type CreateAssetErrorResponse = {
-  success?: false;
-  error?: {
-    messages?: string[];
-    code?: string;
-  };
-  meta?: {
-    statusCode?: number;
-    path?: string;
-    method?: string;
-    timestamp?: string;
-  };
-};
-
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+export async function GET() {
+  const accessToken = (await cookies()).get("access_token")?.value;
+
+  if (!accessToken) {
+    return NextResponse.json(
+      {
+        success: false,
+        error: {
+          messages: ["Authentication required."],
+        },
+      },
+      { status: 401 },
+    );
+  }
+
+  let upstreamResponse: Response;
+
+  try {
+    upstreamResponse = await fetch(buildApiUrl("/assets"), {
+      method: "GET",
+      headers: {
+        Accept: "application/json",
+        Authorization: `Bearer ${accessToken}`,
+      },
+      cache: "no-store",
+    });
+  } catch {
+    return NextResponse.json(
+      {
+        success: false,
+        error: {
+          messages: ["Unable to reach the asset service."],
+        },
+      },
+      { status: 502 },
+    );
+  }
+
+  const responseData = (await parseJson(upstreamResponse)) as
+    | AssetListSuccessResponse
+    | AssetListErrorResponse
+    | null;
+
+  if (!upstreamResponse.ok || responseData?.success !== true) {
+    const upstreamErrorMessages =
+      responseData && "error" in responseData
+        ? responseData.error?.messages?.filter(Boolean)
+        : undefined;
+
+    return NextResponse.json(
+      {
+        success: false,
+        error: {
+          messages: upstreamErrorMessages ?? ["Failed to load assets."],
+        },
+        meta: responseData?.meta,
+      },
+      { status: upstreamResponse.status || 500 },
+    );
+  }
+
+  return NextResponse.json(responseData, {
+    status: upstreamResponse.status || 200,
+  });
+}
 
 export async function POST(request: Request) {
   let body: CreateAssetRequestBody;

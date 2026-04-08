@@ -1,15 +1,23 @@
-import Link from "next/link";
+import { cookies } from "next/headers";
 import DashboardHeader from "../_components/dashboard-header";
-import AssetsTable from "./_components/assets-table";
-import AssetFilters from "./_components/asset-category-filter";
+import { buildApiUrl } from "@/lib/config";
+import type { Asset, AssetListErrorResponse, AssetListSuccessResponse } from "@/lib/assets";
+import Link from "next/link";
+import AssetsView from "./_components/assets-view";
+import { parseJson } from "../dashboard/page";
 
-export default function AssetsPage() {
+type AssetsPageResult =
+  | { status: "success"; data: Asset[] }
+  | { status: "error"; message: string };
+
+export default async function AssetsPage() {
+  const result = await getAssets();
+
   return (
     <div className="flex flex-col min-h-screen">
       <DashboardHeader />
 
       <main className="flex-1 p-6 lg:p-10 space-y-6 max-w-[1200px] mx-auto w-full">
-        {/* Header Section */}
         <div className="flex flex-wrap justify-between items-end gap-4 mb-8">
           <div className="flex flex-col gap-1">
             <h1 className="text-slate-900 text-3xl font-extrabold tracking-tight">
@@ -28,60 +36,81 @@ export default function AssetsPage() {
           </Link>
         </div>
 
-        {/* Filter Toolbar */}
-        <AssetFilters/>
-        {/* Table Card */}
-        <AssetsTable />
-
-        {/* Summary Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-8">
-          <div className="bg-white border border-slate-200 rounded-xl p-6 flex items-center gap-4">
-            <div className="size-12 rounded-full bg-primary/10 flex items-center justify-center text-primary">
-              <span className="material-symbols-outlined text-2xl">
-                inventory
-              </span>
+        {result.status === "error" ? (
+          <section className="rounded-xl border border-rose-200 bg-rose-50 p-6 shadow-sm">
+            <div className="flex items-start gap-3">
+              <span className="material-symbols-outlined text-2xl text-rose-600">error</span>
+              <div>
+                <h2 className="text-base font-semibold text-rose-700">Unable to load assets</h2>
+                <p className="mt-1 text-sm text-rose-700/80">{result.message}</p>
+              </div>
             </div>
-            <div>
-              <p className="text-xs font-bold text-slate-500 uppercase tracking-widest">
-                Total Assets
-              </p>
-              <p className="text-2xl font-black text-slate-900">
-                1,248
-              </p>
+          </section>
+        ) : result.data.length === 0 ? (
+          <section className="rounded-xl border border-dashed border-slate-300 bg-white p-6 shadow-sm">
+            <div className="flex items-start gap-3">
+              <span className="material-symbols-outlined text-2xl text-slate-500">inventory_2</span>
+              <div>
+                <h2 className="text-base font-semibold text-slate-900">No assets yet</h2>
+                <p className="mt-1 text-sm text-slate-500">
+                  Add your first asset to start tracking inventory and assignments.
+                </p>
+              </div>
             </div>
-          </div>
-          <div className="bg-white border border-slate-200 rounded-xl p-6 flex items-center gap-4">
-            <div className="size-12 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-600">
-              <span className="material-symbols-outlined text-2xl">
-                verified
-              </span>
-            </div>
-            <div>
-              <p className="text-xs font-bold text-slate-500 uppercase tracking-widest">
-                Available Items
-              </p>
-              <p className="text-2xl font-black text-slate-900">
-                312
-              </p>
-            </div>
-          </div>
-          <div className="bg-white border border-slate-200 rounded-xl p-6 flex items-center gap-4">
-            <div className="size-12 rounded-full bg-amber-100 flex items-center justify-center text-amber-600">
-              <span className="material-symbols-outlined text-2xl">
-                assignment_ind
-              </span>
-            </div>
-            <div>
-              <p className="text-xs font-bold text-slate-500 uppercase tracking-widest">
-                Assigned Assets
-              </p>
-              <p className="text-2xl font-black text-slate-900">
-                936
-              </p>
-            </div>
-          </div>
-        </div>
+          </section>
+        ) : (
+          <AssetsView assets={result.data} />
+        )}
       </main>
     </div>
   );
+}
+
+async function getAssets(): Promise<AssetsPageResult> {
+  const cookieStore = await cookies();
+  const accessToken = cookieStore.get("access_token")?.value;
+
+  if (!accessToken) {
+    return {
+      status: "error",
+      message: "Your admin session is missing. Please sign in again to continue.",
+    };
+  }
+
+  let response: Response;
+
+  try {
+    response = await fetch(buildApiUrl("/assets"), {
+      method: "GET",
+      headers: {
+        Accept: "application/json",
+        Authorization: `Bearer ${accessToken}`,
+      },
+      cache: "no-store",
+    });
+  } catch {
+    return {
+      status: "error",
+      message: "The asset service could not be reached right now.",
+    };
+  }
+
+  const responseData = (await parseJson(response)) as
+    | AssetListSuccessResponse
+    | AssetListErrorResponse
+    | null;
+
+  if (!response.ok || responseData?.success !== true || !Array.isArray(responseData.data)) {
+    return {
+      status: "error",
+      message:
+        responseData?.error?.messages?.filter(Boolean).join(" ") ||
+        "Failed to load assets.",
+    };
+  }
+
+  return {
+    status: "success",
+    data: responseData.data,
+  };
 }
